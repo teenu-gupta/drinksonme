@@ -4,7 +4,7 @@ from django.contrib.auth import get_user_model
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from serializers import RegisterSerializer , LoginSerializer , EmailVerifySerializer , PersonSerializer
+from serializers import RegisterSerializer , LoginSerializer , EmailVerifySerializer , PersonSerializer, ProfileImageSerializer
 from django.contrib.auth import authenticate, get_user_model , logout
 from accounts.models import *
 import datetime
@@ -90,22 +90,71 @@ class EmailVerify(generics.GenericAPIView):
 			return Response(serializer.errors,status=status.HTTP_400_BAD_REQUEST)
 			
 
-class ProfileCreate(generics.CreateAPIView):
-	"""
-	Create a profile
-	"""
-	serializer_class = PersonSerializer
-	queryset = Person.objects.all()
+# class ProfileCreate(generics.CreateAPIView):
+# 	"""
+# 	Create a profile
+# 	"""
+# 	serializer_class = PersonSerializer
+# 	queryset = Person.objects.all()
 
-class ProfileUpdate(generics.UpdateAPIView):
+class ProfileUpdate(generics.GenericAPIView):
 	"""
 	Update a Profile
+
 	"""
+	model = Person
 	serializer_class = PersonSerializer
 
-class ProfileDetail(generics.ListAPIView):
+	def get(self,request,pk):
+		person = Person.objects.get(pk=request.user.pk)
+		serializer = PersonSerializer(person)
+		return Response(data=serializer.data,status=status.HTTP_200_OK)
+
+class ProfileCreate(generics.GenericAPIView):
 	"""
-	retrieve a peron ProfileDetail
+	Create A User Profile
+
 	"""
+	model = Person
 	serializer_class = PersonSerializer
-	queryset = Person.objects.all()
+
+	def post(self,request):
+		serializer = self.serializer_class(data=request.data)
+		
+		if serializer.is_valid():
+			serializer.save()
+			return Response(data=serializer.data, status=status.HTTP_200_OK)
+		else:
+			return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ProfileImageView(generics.GenericAPIView):
+    """
+        Add and remove person profile image
+    """
+
+    model = ProfileImage
+    serializer_class = ProfileImageSerializer
+    permission_classes = (permissions.IsAuthenticated,)
+
+    # def get(self, request):
+    #     profile_image = self.model.objects.get(owner__owner=request.user)
+    #     serializer = self.serializer_class(profile_image)
+    #     return Response(data=serializer.data, status=status.HTTP_200_OK)
+
+    def put(self, request):
+        profile_image = self.model.objects.get(owner__owner=request.user)
+        serializer = self.serializer_class(profile_image, data=request.DATA,
+                                           files=request.FILES)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(data=serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    def delete(self,request):
+        obj = get_object_or_404(ProfileImage,owner__owner=self.request.user)
+        obj.image = ""
+        obj.save()
+        data = {"Details": "Profile Image is deleted successfully"}
+        return Response(data)
+
